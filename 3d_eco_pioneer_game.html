@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>環保小先鋒 3D - Eco Pioneer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #020617;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+        /* Mobile Touch Buttons */
+        .touch-btn {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 9999px;
+            transition: transform 0.1s ease, background 0.1s ease;
+        }
+        .touch-btn:active {
+            background: rgba(16, 185, 129, 0.6);
+            transform: scale(0.92);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white select-none overflow-hidden">
+
+    <!-- 3D CANVAS CONTAINER -->
+    <div id="game-container"></div>
+
+    <!-- HUD OVERLAY -->
+    <div id="hud" class="absolute top-0 left-0 w-full p-4 pointer-events-none flex justify-between items-start z-10 hidden">
+        <!-- Score & Level Status -->
+        <div class="bg-slate-900/90 backdrop-blur-md p-3.5 rounded-2xl border border-emerald-500/30 shadow-xl min-w-[150px]">
+            <div class="text-xs uppercase tracking-wider text-emerald-400 font-extrabold mb-1" id="level-indicator">關卡 1 (城市公園)</div>
+            <div class="text-2xl font-black text-white flex items-center gap-2">
+                <i class="fa-solid fa-trophy text-amber-400 text-xl"></i>
+                <span id="score-text">0</span> <span class="text-xs text-slate-400">/ 100 分</span>
+            </div>
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-800 h-2.5 rounded-full mt-2 overflow-hidden border border-slate-700">
+                <div id="progress-bar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full w-0 transition-all duration-300"></div>
+            </div>
+        </div>
+
+        <!-- Health Indicator -->
+        <div class="bg-slate-900/90 backdrop-blur-md p-3.5 rounded-2xl border border-rose-500/30 shadow-xl flex flex-col items-end min-w-[130px]">
+            <div class="text-xs uppercase tracking-wider text-rose-400 font-extrabold mb-1">生命值 (HP)</div>
+            <div id="hp-hearts" class="flex gap-1.5 text-xl text-rose-500 drop-shadow">
+                <i class="fa-solid fa-heart"></i>
+                <i class="fa-solid fa-heart"></i>
+                <i class="fa-solid fa-heart"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOUCH CONTROLS (Mobile Friendly) -->
+    <div id="touch-controls" class="absolute bottom-6 left-0 right-0 px-6 flex justify-between items-end pointer-events-none z-20">
+        <!-- Direction Buttons -->
+        <div class="flex gap-3 pointer-events-auto">
+            <button id="btn-left" class="touch-btn w-16 h-16 flex items-center justify-center text-2xl text-white shadow-2xl active:bg-emerald-500/50">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <button id="btn-right" class="touch-btn w-16 h-16 flex items-center justify-center text-2xl text-white shadow-2xl active:bg-emerald-500/50">
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+
+        <!-- Shoot Beam Button -->
+        <div class="pointer-events-auto">
+            <button id="btn-shoot" class="touch-btn w-20 h-20 bg-emerald-500/40 border-emerald-400 flex flex-col items-center justify-center text-white shadow-2xl active:scale-95">
+                <i class="fa-solid fa-recycle text-2xl text-emerald-300 mb-0.5"></i>
+                <span class="text-[10px] font-bold tracking-widest uppercase text-emerald-100">回收光束</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- START SCREEN -->
+    <div id="start-screen" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="max-w-md w-full bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-emerald-500/20 rounded-2xl text-emerald-400 text-4xl mb-4 border border-emerald-500/40 shadow-inner">
+                <i class="fa-solid fa-seedling"></i>
+            </div>
+
+            <h1 class="text-3xl font-black tracking-tight text-white mb-2">環保小先鋒 3D</h1>
+            <p class="text-slate-400 text-sm mb-5">3D 綠色冒險射擊遊戲</p>
+
+            <div class="bg-slate-800/90 rounded-2xl p-4 text-left text-xs text-slate-300 space-y-2.5 mb-6 border border-slate-700">
+                <div class="font-bold text-emerald-400 text-sm mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info"></i> 遊戲規則與提示：
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">可回收</span>
+                    <span>收集或以光束擊中寶特瓶、紙箱、鋁罐 (<b>+20分</b>)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded font-bold">不可回收</span>
+                    <span>避免撞擊毒廢料或垃圾 (撞擊<b>扣血</b>)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded font-bold">關卡</span>
+                    <span>共有 <b>2 個關卡</b>，每關滿 <b>100 分</b> 即可過關！</span>
+                </div>
+                <div class="border-t border-slate-700/80 pt-2 text-slate-400">
+                    <b>操作：</b> 鍵盤 A/D 或 ←/→ 移動，空格鍵發射；或點擊畫面控制按鈕。
+                </div>
+            </div>
+
+            <button id="start-btn" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-lg rounded-2xl shadow-lg shadow-emerald-500/30 transition-all active:scale-95 cursor-pointer">
+                開始拯救地球 <i class="fa-solid fa-play ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- LEVEL CLEAR MODAL -->
+    <div id="level-clear-screen" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+        <div class="max-w-md w-full bg-slate-900 border border-teal-500/40 rounded-3xl p-6 text-center shadow-2xl">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-teal-500/20 rounded-full text-teal-400 text-4xl mb-4 border border-teal-500/40">
+                <i class="fa-solid fa-award"></i>
+            </div>
+            <h2 class="text-2xl font-black text-white mb-2" id="clear-title">第一關 順利通關！</h2>
+            <p class="text-slate-300 text-sm mb-6" id="clear-desc">太棒了！成功清除了公園的垃圾，準備前往高科技綠能城！</p>
+            <button id="next-level-btn" class="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold text-lg rounded-2xl shadow-lg shadow-teal-500/30 active:scale-95 cursor-pointer">
+                進入第二關 <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME OVER / VICTORY MODAL -->
+    <div id="game-over-screen" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-6 text-center shadow-2xl">
+            <div id="game-over-icon" class="inline-flex items-center justify-center w-20 h-20 bg-rose-500/20 rounded-full text-rose-400 text-4xl mb-4 border border-rose-500/40">
+                <i class="fa-solid fa-heart-crack"></i>
+            </div>
+            <h2 id="game-over-title" class="text-3xl font-black text-white mb-2">挑戰失敗</h2>
+            <p id="game-over-desc" class="text-slate-400 text-sm mb-6">垃圾佔領了城市...再試一次吧！</p>
+            
+            <div class="bg-slate-800/80 p-4 rounded-2xl mb-6 flex justify-around border border-slate-700">
+                <div>
+                    <div class="text-xs text-slate-400">最終得分</div>
+                    <div id="final-score" class="text-2xl font-bold text-emerald-400">0</div>
+                </div>
+                <div>
+                    <div class="text-xs text-slate-400">到達關卡</div>
+                    <div id="final-level" class="text-2xl font-bold text-teal-400">1</div>
+                </div>
+            </div>
+
+            <button id="restart-btn" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-lg rounded-2xl shadow-lg shadow-emerald-500/30 active:scale-95 cursor-pointer">
+                重新開始遊戲 <i class="fa-solid fa-rotate-right ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Game Constants & Parameters
+        const TARGET_SCORE = 100;
+        const ITEM_TYPES = { RECYCLABLE: 'recyclable', NON_RECYCLABLE: 'non_recyclable' };
+
+        let gameState = {
+            active: false,
+            level: 1,
+            score: 0,
+            hp: 3,
+            maxHp: 3,
+            speed: 0.28,
+            spawnTimer: 0,
+            spawnInterval: 50,
+            items: [],
+            bullets: [],
+            particles: []
+        };
+
+        const keys = { left: false, right: false, space: false };
+
+        // Three.js Core Variables
+        let scene, camera, renderer;
+        let playerGroup, playerMesh;
+        let environmentGroup;
+
+        // Audio System Synthesizer
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function playSound(type) {
+            if (!audioCtx) {
+                try { audioCtx = new AudioCtx(); } catch(e) {}
+            }
+            if (!audioCtx) return;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'collect') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now); osc.stop(now + 0.15);
+            } else if (type === 'hit') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(60, now + 0.25);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now); osc.stop(now + 0.25);
+            } else if (type === 'shoot') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'clear') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(554.37, now + 0.1);
+                osc.frequency.setValueAtTime(659.25, now + 0.2);
+                osc.frequency.setValueAtTime(880, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now); osc.stop(now + 0.5);
+            }
+        }
+
+        function initEngine() {
+            const container = document.getElementById('game-container');
+
+            // 1. Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020617);
+            scene.fog = new THREE.FogExp2(0x020617, 0.02);
+
+            // 2. Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 4.5, 9);
+            camera.lookAt(0, 1, -2);
+
+            // 3. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 4. Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            dirLight.position.set(10, 20, 10);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+
+            // 5. Environment & Player Setup
+            environmentGroup = new THREE.Group();
+            scene.add(environmentGroup);
+
+            createPlayerMascot();
+            buildTrack();
+
+            // Window Resize Listener
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // Create Mascot Character "環保小先鋒"
+        function createPlayerMascot() {
+            playerGroup = new THREE.Group();
+
+            // Main Body (Eco Jet Robot)
+            const bodyGeo = new THREE.CylinderGeometry(0.45, 0.35, 1.1, 16);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3, metalness: 0.2 });
+            playerMesh = new THREE.Mesh(bodyGeo, bodyMat);
+            playerMesh.position.y = 0.75;
+            playerMesh.castShadow = true;
+            playerGroup.add(playerMesh);
+
+            // Helmet Head
+            const headGeo = new THREE.SphereGeometry(0.38, 16, 16);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 1.45;
+            head.castShadow = true;
+            playerGroup.add(head);
+
+            // Glowing Visor
+            const visorGeo = new THREE.BoxGeometry(0.45, 0.18, 0.25);
+            const visorMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x06b6d4, emissiveIntensity: 0.6 });
+            const visor = new THREE.Mesh(visorGeo, visorMat);
+            visor.position.set(0, 1.5, 0.22);
+            playerGroup.add(visor);
+
+            // Chest Eco Emblem Ring
+            const badgeGeo = new THREE.TorusGeometry(0.16, 0.04, 8, 24);
+            const badgeMat = new THREE.MeshStandardMaterial({ color: 0x34d399, emissive: 0x34d399, emissiveIntensity: 0.5 });
+            const badge = new THREE.Mesh(badgeGeo, badgeMat);
+            badge.position.set(0, 0.85, 0.38);
+            badge.rotation.x = Math.PI / 2;
+            playerGroup.add(badge);
+
+            // Jetpack Thruster
+            const packGeo = new THREE.BoxGeometry(0.5, 0.7, 0.35);
+            const packMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
+            const pack = new THREE.Mesh(packGeo, packMat);
+            pack.position.set(0, 0.85, -0.35);
+            playerGroup.add(pack);
+
+            playerGroup.position.set(0, 0, 4);
+            scene.add(playerGroup);
+        }
+
+        function buildTrack() {
+            // Main Track Floor
+            const trackGeo = new THREE.PlaneGeometry(10, 100);
+            const trackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+            const track = new THREE.Mesh(trackGeo, trackMat);
+            track.rotation.x = -Math.PI / 2;
+            track.position.z = -30;
+            track.receiveShadow = true;
+            environmentGroup.add(track);
+
+            // Side Curbs
+            const borderGeo = new THREE.BoxGeometry(0.8, 0.3, 100);
+            const borderMat = new THREE.MeshStandardMaterial({ color: gameState.level === 1 ? 0x059669 : 0x0284c7 });
+
+            const leftBorder = new THREE.Mesh(borderGeo, borderMat);
+            leftBorder.position.set(-5.4, 0.15, -30);
+            environmentGroup.add(leftBorder);
+
+            const rightBorder = new THREE.Mesh(borderGeo, borderMat);
+            rightBorder.position.set(5.4, 0.15, -30);
+            environmentGroup.add(rightBorder);
+
+            // Environment Details (Trees / Eco Towers)
+            for (let i = 0; i < 18; i++) {
+                createSideScenery(-7, -i * 6);
+                createSideScenery(7, -i * 6);
+            }
+        }
+
+        function createSideScenery(x, z) {
+            const group = new THREE.Group();
+            if (gameState.level === 1) {
+                // Level 1: Park Trees
+                const trunkGeo = new THREE.CylinderGeometry(0.18, 0.25, 1.4);
+                const trunkMat = new THREE.MeshStandardMaterial({ color: 0x78350f });
+                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                trunk.position.y = 0.7;
+
+                const leavesGeo = new THREE.ConeGeometry(1.1, 2.2, 8);
+                const leavesMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.6 });
+                const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+                leaves.position.y = 2.1;
+
+                group.add(trunk, leaves);
+            } else {
+                // Level 2: Futuristic Sci-Fi Solar Columns
+                const towerGeo = new THREE.BoxGeometry(0.7, 3.5, 0.7);
+                const towerMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7 });
+                const tower = new THREE.Mesh(towerGeo, towerMat);
+                tower.position.y = 1.75;
+
+                const orbGeo = new THREE.SphereGeometry(0.4, 12, 12);
+                const orbMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.6 });
+                const orb = new THREE.Mesh(orbGeo, orbMat);
+                orb.position.y = 3.8;
+
+                group.add(tower, orb);
+            }
+
+            group.position.set(x, 0, z);
+            environmentGroup.add(group);
+        }
+
+        function spawnItem() {
+            const lanes = [-2.8, 0, 2.8];
+            const laneX = lanes[Math.floor(Math.random() * lanes.length)];
+            const isRecyclable = Math.random() > 0.42; // 58% recyclable, 42% non-recyclable
+
+            const itemGroup = new THREE.Group();
+            const itemType = isRecyclable ? ITEM_TYPES.RECYCLABLE : ITEM_TYPES.NON_RECYCLABLE;
+            const subType = Math.floor(Math.random() * 3);
+
+            if (isRecyclable) {
+                // Recyclables
+                if (subType === 0) {
+                    // Bottle
+                    const geo = new THREE.CylinderGeometry(0.18, 0.22, 0.7, 12);
+                    const mat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85 });
+                    const bottle = new THREE.Mesh(geo, mat);
+                    bottle.rotation.z = Math.PI / 4;
+                    bottle.position.y = 0.55;
+                    itemGroup.add(bottle);
+                } else if (subType === 1) {
+                    // Paper Box
+                    const geo = new THREE.BoxGeometry(0.55, 0.55, 0.55);
+                    const mat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.8 });
+                    const box = new THREE.Mesh(geo, mat);
+                    box.position.y = 0.55;
+                    itemGroup.add(box);
+                } else {
+                    // Metal Can
+                    const geo = new THREE.CylinderGeometry(0.25, 0.25, 0.55, 16);
+                    const mat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.8, roughness: 0.2 });
+                    const can = new THREE.Mesh(geo, mat);
+                    can.position.y = 0.55;
+                    itemGroup.add(can);
+                }
+            } else {
+                // Non-recyclables
+                if (subType === 0) {
+                    // Toxic Drum
+                    const geo = new THREE.CylinderGeometry(0.35, 0.35, 0.8, 12);
+                    const mat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.4 });
+                    const drum = new THREE.Mesh(geo, mat);
+                    drum.position.y = 0.55;
+                    itemGroup.add(drum);
+                } else if (subType === 1) {
+                    // Hazardous Garbage Block
+                    const geo = new THREE.DodecahedronGeometry(0.38);
+                    const mat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9 });
+                    const waste = new THREE.Mesh(geo, mat);
+                    waste.position.y = 0.55;
+                    itemGroup.add(waste);
+                } else {
+                    // Sludge Bag
+                    const geo = new THREE.SphereGeometry(0.36, 10, 10);
+                    const mat = new THREE.MeshStandardMaterial({ color: 0xa855f7 });
+                    const bag = new THREE.Mesh(geo, mat);
+                    bag.position.y = 0.55;
+                    itemGroup.add(bag);
+                }
+            }
+
+            // Interactive Aura Floor Ring
+            const ringGeo = new THREE.RingGeometry(0.45, 0.6, 16);
+            const ringMat = new THREE.MeshBasicMaterial({ color: isRecyclable ? 0x10b981 : 0xf43f5e, side: THREE.DoubleSide });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.05;
+            itemGroup.add(ring);
+
+            itemGroup.position.set(laneX, 0, -42);
+            itemGroup.userData = { type: itemType, radius: 0.6 };
+
+            scene.add(itemGroup);
+            gameState.items.push(itemGroup);
+        }
+
+        function shootRecycleBeam() {
+            if (!gameState.active) return;
+            playSound('shoot');
+
+            const geo = new THREE.SphereGeometry(0.28, 12, 12);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x34d399, emissive: 0x34d399, emissiveIntensity: 0.8 });
+            const bullet = new THREE.Mesh(geo, mat);
+
+            bullet.position.set(playerGroup.position.x, 0.8, playerGroup.position.z - 0.5);
+            scene.add(bullet);
+            gameState.bullets.push(bullet);
+
+            playerMesh.position.z = 0.15;
+            setTimeout(() => { if (playerMesh) playerMesh.position.z = 0; }, 80);
+        }
+
+        function createSparkles(x, y, z, colorHex) {
+            for (let i = 0; i < 10; i++) {
+                const pGeo = new THREE.SphereGeometry(0.08, 6, 6);
+                const pMat = new THREE.MeshBasicMaterial({ color: colorHex });
+                const p = new THREE.Mesh(pGeo, pMat);
+                p.position.set(x, y, z);
+                
+                p.userData = {
+                    vx: (Math.random() - 0.5) * 0.25,
+                    vy: Math.random() * 0.25 + 0.1,
+                    vz: (Math.random() - 0.5) * 0.25,
+                    life: 1.0
+                };
+                
+                scene.add(p);
+                gameState.particles.push(p);
+            }
+        }
+
+        function updateGameLogic() {
+            if (!gameState.active) return;
+
+            // Player Movement
+            const moveSpeed = 0.16;
+            if (keys.left && playerGroup.position.x > -3.2) {
+                playerGroup.position.x -= moveSpeed;
+                playerGroup.rotation.z = 0.18;
+            } else if (keys.right && playerGroup.position.x < 3.2) {
+                playerGroup.position.x += moveSpeed;
+                playerGroup.rotation.z = -0.18;
+            } else {
+                playerGroup.rotation.z = 0;
+            }
+
+            // Spawn Items
+            gameState.spawnTimer++;
+            if (gameState.spawnTimer >= gameState.spawnInterval) {
+                gameState.spawnTimer = 0;
+                spawnItem();
+            }
+
+            // Bullets Movement & Collision
+            for (let i = gameState.bullets.length - 1; i >= 0; i--) {
+                const b = gameState.bullets[i];
+                b.position.z -= 0.65;
+
+                for (let j = gameState.items.length - 1; j >= 0; j--) {
+                    const item = gameState.items[j];
+                    const dist = b.position.distanceTo(item.position);
+
+                    if (dist < 1.1) {
+                        if (item.userData.type === ITEM_TYPES.RECYCLABLE) {
+                            addScore(20); // +20 points per requirement
+                            playSound('collect');
+                            createSparkles(item.position.x, 0.5, item.position.z, 0x10b981);
+                        } else {
+                            playSound('collect');
+                            createSparkles(item.position.x, 0.5, item.position.z, 0x38bdf8);
+                        }
+
+                        scene.remove(item);
+                        gameState.items.splice(j, 1);
+                        scene.remove(b);
+                        gameState.bullets.splice(i, 1);
+                        break;
+                    }
+                }
+
+                if (b && b.position.z < -45) {
+                    scene.remove(b);
+                    gameState.bullets.splice(i, 1);
+                }
+            }
+
+            // Items Movement & Collision
+            for (let i = gameState.items.length - 1; i >= 0; i--) {
+                const item = gameState.items[i];
+                item.position.z += gameState.speed;
+                item.rotation.y += 0.035;
+
+                const distToPlayer = item.position.distanceTo(playerGroup.position);
+                if (distToPlayer < 1.05) {
+                    if (item.userData.type === ITEM_TYPES.RECYCLABLE) {
+                        addScore(20);
+                        playSound('collect');
+                        createSparkles(item.position.x, 0.8, item.position.z, 0x34d399);
+                    } else {
+                        takeDamage(1);
+                        playSound('hit');
+                        createSparkles(item.position.x, 0.8, item.position.z, 0xf43f5e);
+                    }
+
+                    scene.remove(item);
+                    gameState.items.splice(i, 1);
+                    continue;
+                }
+
+                if (item.position.z > 7) {
+                    scene.remove(item);
+                    gameState.items.splice(i, 1);
+                }
+            }
+
+            // Particles Update
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const p = gameState.particles[i];
+                p.position.x += p.userData.vx;
+                p.position.y += p.userData.vy;
+                p.position.z += p.userData.vz;
+                p.userData.life -= 0.06;
+                p.scale.setScalar(Math.max(0.01, p.userData.life));
+
+                if (p.userData.life <= 0) {
+                    scene.remove(p);
+                    gameState.particles.splice(i, 1);
+                }
+            }
+
+            // Environment Scrolling
+            environmentGroup.position.z += gameState.speed;
+            if (environmentGroup.position.z > 24) {
+                environmentGroup.position.z = 0;
+            }
+        }
+
+        function addScore(points) {
+            gameState.score += points;
+            document.getElementById('score-text').innerText = gameState.score;
+            
+            const pct = Math.min(100, (gameState.score / TARGET_SCORE) * 100);
+            document.getElementById('progress-bar').style.width = `${pct}%`;
+
+            if (gameState.score >= TARGET_SCORE) {
+                levelClear();
+            }
+        }
+
+        function takeDamage(amount) {
+            gameState.hp -= amount;
+            updateHPUI();
+            if (gameState.hp <= 0) {
+                gameOver(false);
+            }
+        }
+
+        function updateHPUI() {
+            const container = document.getElementById('hp-hearts');
+            container.innerHTML = '';
+            for (let i = 0; i < gameState.maxHp; i++) {
+                if (i < gameState.hp) {
+                    container.innerHTML += '<i class="fa-solid fa-heart drop-shadow"></i>';
+                } else {
+                    container.innerHTML += '<i class="fa-regular fa-heart text-slate-700"></i>';
+                }
+            }
+        }
+
+        function levelClear() {
+            gameState.active = false;
+            playSound('clear');
+
+            if (gameState.level === 1) {
+                document.getElementById('clear-title').innerText = "第一關 順利通關！";
+                document.getElementById('clear-desc').innerText = "太棒了！環保小先鋒成功清除了公園的可回收物！準備挑戰高難度的綠能科技城！";
+                document.getElementById('next-level-btn').innerText = "進入第二關";
+                document.getElementById('level-clear-screen').classList.remove('hidden');
+            } else {
+                gameOver(true);
+            }
+        }
+
+        function startNextLevel() {
+            document.getElementById('level-clear-screen').classList.add('hidden');
+            gameState.level = 2;
+            gameState.score = 0;
+            gameState.hp = 3;
+            gameState.speed = 0.36;
+            gameState.spawnInterval = 42;
+
+            document.getElementById('level-indicator').innerText = "關卡 2 (綠能城)";
+            document.getElementById('score-text').innerText = "0";
+            document.getElementById('progress-bar').style.width = "0%";
+            updateHPUI();
+
+            while(environmentGroup.children.length > 0) { 
+                environmentGroup.remove(environmentGroup.children[0]); 
+            }
+            buildTrack();
+
+            gameState.active = true;
+        }
+
+        function gameOver(isVictory) {
+            gameState.active = false;
+
+            const modal = document.getElementById('game-over-screen');
+            const icon = document.getElementById('game-over-icon');
+            const title = document.getElementById('game-over-title');
+            const desc = document.getElementById('game-over-desc');
+
+            if (isVictory) {
+                icon.className = "inline-flex items-center justify-center w-20 h-20 bg-emerald-500/20 rounded-full text-emerald-400 text-4xl mb-4 border border-emerald-500/40";
+                icon.innerHTML = '<i class="fa-solid fa-trophy"></i>';
+                title.innerText = "恭喜拯救地球！";
+                desc.innerText = "你已順利通過所有關卡，成為真正的「環保小先鋒」！";
+                playSound('clear');
+            } else {
+                icon.className = "inline-flex items-center justify-center w-20 h-20 bg-rose-500/20 rounded-full text-rose-400 text-4xl mb-4 border border-rose-500/40";
+                icon.innerHTML = '<i class="fa-solid fa-heart-crack"></i>';
+                title.innerText = "挑戰失敗";
+                desc.innerText = "不小心收集了太多有害垃圾...重新挑戰吧！";
+            }
+
+            document.getElementById('final-score').innerText = gameState.score;
+            document.getElementById('final-level').innerText = gameState.level;
+
+            modal.classList.remove('hidden');
+        }
+
+        function resetGame() {
+            gameState.items.forEach(i => scene.remove(i));
+            gameState.bullets.forEach(b => scene.remove(b));
+            gameState.particles.forEach(p => scene.remove(p));
+
+            gameState.items = [];
+            gameState.bullets = [];
+            gameState.particles = [];
+            gameState.level = 1;
+            gameState.score = 0;
+            gameState.hp = 3;
+            gameState.speed = 0.28;
+            gameState.spawnInterval = 50;
+
+            document.getElementById('level-indicator').innerText = "關卡 1 (城市公園)";
+            document.getElementById('score-text').innerText = "0";
+            document.getElementById('progress-bar').style.width = "0%";
+            updateHPUI();
+
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+
+            playerGroup.position.set(0, 0, 4);
+            gameState.active = true;
+        }
+
+        function setupControls() {
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+                if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+                if (e.code === 'Space') {
+                    if (!keys.space) shootRecycleBeam();
+                    keys.space = true;
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+                if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+                if (e.code === 'Space') keys.space = false;
+            });
+
+            // Touch UI Buttons
+            const btnLeft = document.getElementById('btn-left');
+            const btnRight = document.getElementById('btn-right');
+            const btnShoot = document.getElementById('btn-shoot');
+
+            btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+            btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
+            btnLeft.addEventListener('mousedown', () => keys.left = true);
+            btnLeft.addEventListener('mouseup', () => keys.left = false);
+
+            btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+            btnRight.addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
+            btnRight.addEventListener('mousedown', () => keys.right = true);
+            btnRight.addEventListener('mouseup', () => keys.right = false);
+
+            btnShoot.addEventListener('touchstart', (e) => { e.preventDefault(); shootRecycleBeam(); });
+            btnShoot.addEventListener('click', () => shootRecycleBeam());
+
+            // Modal Buttons
+            document.getElementById('start-btn').addEventListener('click', resetGame);
+            document.getElementById('restart-btn').addEventListener('click', resetGame);
+            document.getElementById('next-level-btn').addEventListener('click', startNextLevel);
+        }
+
+        function onWindowResize() {
+            if (!camera || !renderer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            updateGameLogic();
+
+            // Hover animation for character mascot
+            if (playerMesh && gameState.active) {
+                playerMesh.position.y = 0.75 + Math.sin(Date.now() * 0.006) * 0.06;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Initialize when window loads
+        window.onload = function() {
+            initEngine();
+            setupControls();
+            animate();
+        };
+    </script>
+</body>
+</html>
